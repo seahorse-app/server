@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"seahorse.app/server/database"
+	"seahorse.app/server/handlers"
 )
 
 func main() {
@@ -12,7 +13,16 @@ func main() {
 			"message": "pong",
 		})
 	})
+
 	// database setup
 	database.SetupDatabase()
 
+	userHandler := handlers.UserHandler{DB: database.DB}
+
+	userGroup := r.Group("/user")
+	{
+		userGroup.POST("/create", userHandler.Create)
+	}
+
+	r.Run()
 }
