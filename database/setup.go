@@ -3,6 +3,7 @@ package database
 import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"seahorse.app/server/database/models"
 )
 
 var DB *gorm.DB
@@ -14,11 +15,10 @@ func SetupDatabase() {
 		panic("Failed to connect to database!")
 	}
 
-	// Don't need to migrate, because we are using sqlite
-	// err = database.AutoMigrate(&User{})
-	// if err != nil {
-	// 	panic("Failed to migrate database!")
-	// }
+	err = database.AutoMigrate(&models.User{})
+	if err != nil {
+		panic("Failed to migrate database")
+	}
 
 	DB = database
 }
