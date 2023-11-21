@@ -12,8 +12,8 @@ type User struct {
 	LastName     string    `json:"last_name"`
 	BirthDate    string    `json:"birth_date"`
 	Email        string    `json:"email"`
-	PasswordHash string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	PasswordHash string    `json:"-"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 	DeletedAt    time.Time `gorm:"index"`
 }

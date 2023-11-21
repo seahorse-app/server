@@ -42,8 +42,6 @@ func (handler *UserHandler) Create(c *gin.Context) {
 
 	handler.DB.Create(&user)
 
-	// TODO: exclude password hash from response
-
 	// TODO: send welcome mail to user
 	c.JSON(200, gin.H{"user": user})
 }
