@@ -64,5 +64,7 @@ func AuthGuard(DB *gorm.DB) gin.HandlerFunc {
 
 		c.Set("session", session.ID)
 		c.Set("user", session.User)
+
+		c.Next()
 	}
 }
