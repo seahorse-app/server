@@ -22,6 +22,7 @@ func main() {
 	userGroup := r.Group("/user")
 	{
 		userGroup.POST("/create", userHandler.Create)
+		userGroup.POST("/login", userHandler.Login)
 	}
 
 	r.Run()
