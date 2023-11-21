@@ -23,6 +23,8 @@ func main() {
 	{
 		userGroup.POST("/create", userHandler.Create)
 		userGroup.POST("/login", userHandler.Login)
+		userGroup.GET("/profile", userHandler.Profile)
+		userGroup.PUT("/profile", userHandler.UpdateProfile)
 	}
 
 	r.Run()

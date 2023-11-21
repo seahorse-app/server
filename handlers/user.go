@@ -10,6 +10,8 @@ import (
 	"seahorse.app/server/utils"
 )
 
+// TODO: add validation for email
+
 type UserHandler struct {
 	DB *gorm.DB
 }
@@ -25,6 +27,13 @@ type UserCreateDTO struct {
 
 type UserLogin struct {
 	UserBaseDTO
+}
+
+type UserProfileDTO struct {
+	Birthdate string `json:"birthdate"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Email     string `json:"email"`
 }
 
 func (handler *UserHandler) Create(c *gin.Context) {
@@ -105,4 +114,12 @@ func (handler *UserHandler) Login(c *gin.Context) {
 
 	c.SetCookie("token", tokenString, 60*60*24*7, "/", "localhost", false, true)
 	c.JSON(200, gin.H{"ok": 1})
+}
+
+func (handler *UserHandler) Profile(c *gin.Context) {
+
+}
+
+func (handler *UserHandler) UpdateProfile(c *gin.Context) {
+
 }
