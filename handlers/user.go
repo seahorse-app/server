@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 	"seahorse.app/server/database/models"
 	"seahorse.app/server/utils"
@@ -54,23 +57,52 @@ func (handler *UserHandler) Create(c *gin.Context) {
 	c.JSON(200, gin.H{"user": user})
 }
 
-func (handler *UserHandler) Login(ctx *gin.Context) {
+func (handler *UserHandler) Login(c *gin.Context) {
+	// TODO: replace with env variable for domain
+	// TODO: check which device is logging in for longer/shorter session
+	// TODO: set cookie expiration accourdingly
+
 	var userLoginData UserLogin
-	if err := ctx.ShouldBindJSON(&userLoginData); err != nil {
-		ctx.JSON(400, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&userLoginData); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
 	var user models.User
 	if err := handler.DB.Where("email=?", userLoginData.Email).First(&user).Error; err != nil {
-		ctx.JSON(404, gin.H{"error": "User not found"})
+		c.JSON(404, gin.H{"error": "User not found"})
 		return
 	}
 
 	if !utils.CheckPassword(userLoginData.Password, user.PasswordHash) {
-		ctx.JSON(400, gin.H{"error": "Invalid password"})
+		c.JSON(400, gin.H{"error": "Invalid password"})
 		return
 	}
 
-	// TODO: generate jwt token..
+	session := models.Session{
+		UserID: user.ID,
+	}
+
+	handler.DB.Create(&session)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": user.ID,
+		"sid": session.ID,
+		"iss": "seahorse.app",
+		"aud": "user",
+		"nbf": time.Now().Unix(),
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(time.Hour * 24 * 7).Unix(),
+	})
+
+	tokenString, err := token.SignedString([]byte("secret"))
+
+	if err != nil {
+		handler.DB.Delete(&session)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("token", tokenString, 60*60*24*7, "/", "localhost", false, true)
+	c.JSON(200, gin.H{"ok": 1})
 }
