@@ -11,13 +11,21 @@ type UserHandler struct {
 	DB *gorm.DB
 }
 
-type UserCreate struct {
-	Password string `json:"password" binding:"required"`
+type UserBaseDTO struct {
 	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type UserCreateDTO struct {
+	UserBaseDTO
+}
+
+type UserLogin struct {
+	UserBaseDTO
 }
 
 func (handler *UserHandler) Create(c *gin.Context) {
-	var userData UserCreate
+	var userData UserCreateDTO
 	if err := c.ShouldBindJSON(&userData); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
@@ -44,4 +52,8 @@ func (handler *UserHandler) Create(c *gin.Context) {
 
 	// TODO: send welcome mail to user
 	c.JSON(200, gin.H{"user": user})
+}
+
+func (handler *UserHandler) Login(ctx *gin.Context) {
+
 }
