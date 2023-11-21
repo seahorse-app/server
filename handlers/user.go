@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"seahorse.app/server/database/models"
+	"seahorse.app/server/utils"
 )
 
 type UserHandler struct {
@@ -27,14 +28,22 @@ func (handler *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// TODO: Password encryption
+	passwordHash, err := utils.HashPassword(userData.Password)
+
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 
 	user := models.User{
 		Email:        userData.Email,
-		PasswordHash: userData.Password,
+		PasswordHash: passwordHash,
 	}
 
 	handler.DB.Create(&user)
 
-	c.String(200, string(user.CreatedAt.String()))
+	// TODO: exclude password hash from response
+
+	// TODO: send welcome mail to user
+	c.JSON(200, gin.H{"user": user})
 }
