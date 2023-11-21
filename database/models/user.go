@@ -1,8 +1,9 @@
 package models
 
 import (
+	"time"
+
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type User struct {
@@ -12,5 +13,7 @@ type User struct {
 	BirthDate    string    `json:"birth_date"`
 	Email        string    `json:"email"`
 	PasswordHash string
-	gorm.Model
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    time.Time `gorm:"index"`
 }
