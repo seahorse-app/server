@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"seahorse.app/server/database"
 	"seahorse.app/server/handlers"
+	"seahorse.app/server/middleware"
 )
 
 func main() {
@@ -16,6 +17,12 @@ func main() {
 
 	// database setup
 	database.SetupDatabase()
+
+	r.GET("/middlewaretest", middleware.AuthGuard(database.DB), func(ctx *gin.Context) {
+		ctx.JSON(200, gin.H{
+			"message": "middlewaretest",
+		})
+	})
 
 	userHandler := handlers.UserHandler{DB: database.DB}
 
