@@ -55,5 +55,22 @@ func (handler *UserHandler) Create(c *gin.Context) {
 }
 
 func (handler *UserHandler) Login(ctx *gin.Context) {
+	var userLoginData UserLogin
+	if err := ctx.ShouldBindJSON(&userLoginData); err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 
+	var user models.User
+	if err := handler.DB.Where("email=?", userLoginData.Email).First(&user).Error; err != nil {
+		ctx.JSON(404, gin.H{"error": "User not found"})
+		return
+	}
+
+	if !utils.CheckPassword(userLoginData.Password, user.PasswordHash) {
+		ctx.JSON(400, gin.H{"error": "Invalid password"})
+		return
+	}
+
+	// TODO: generate jwt token..
 }
