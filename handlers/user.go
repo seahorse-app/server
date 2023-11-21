@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"seahorse.app/server/database/models"
 )
 
 type UserHandler struct {
@@ -10,7 +11,6 @@ type UserHandler struct {
 }
 
 type UserCreate struct {
-	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 	Email    string `json:"email" binding:"required"`
 }
@@ -21,5 +21,20 @@ func (handler *UserHandler) Create(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	println(userData.Username)
+
+	if userFound := handler.DB.Where("email=?", userData.Email).First(&models.User{}); userFound.RowsAffected > 0 {
+		c.JSON(400, gin.H{"error": "User already exists"})
+		return
+	}
+
+	// TODO: Password encryption
+
+	user := models.User{
+		Email:        userData.Email,
+		PasswordHash: userData.Password,
+	}
+
+	handler.DB.Create(&user)
+
+	c.String(200, string(user.CreatedAt.String()))
 }
