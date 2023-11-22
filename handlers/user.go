@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"seahorse.app/server/database/models"
 	"seahorse.app/server/utils"
@@ -34,6 +35,11 @@ type UserProfileDTO struct {
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	Email     string `json:"email"`
+}
+
+type UserProfileOwnerDTO struct {
+	UserProfileDTO
+	ID uuid.UUID `json:"id"`
 }
 
 func (handler *UserHandler) Create(c *gin.Context) {
@@ -116,19 +122,46 @@ func (handler *UserHandler) Login(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": 1})
 }
 
+// TODO: corporate both profile functions into one
+
 func (handler *UserHandler) Profile(c *gin.Context) {
 	// TODO: check for authorization
-	userID, _ := c.Get("userID")
 	var user models.User
-	if err := handler.DB.Where("id=?", userID).First(&user).Error; err != nil {
+	userParam := c.Param("id")
+	if err := handler.DB.Where("id=?", userParam).First(&user).Error; err != nil {
 		c.JSON(404, gin.H{"error": "User not found"})
 		return
 	}
+	c.JSON(200, gin.H{"user": UserProfileOwnerDTO{
+		UserProfileDTO: UserProfileDTO{
+			Birthdate: user.BirthDate,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			Email:     user.Email,
+		},
+		ID: user.ID}})
 
-	c.JSON(200, gin.H{"user": user})
+}
+
+func (handler *UserHandler) OwnProfile(c *gin.Context) {
+	user := c.MustGet("user").(models.User)
+	c.JSON(200, gin.H{"user": UserProfileOwnerDTO{
+		UserProfileDTO: UserProfileDTO{
+			Birthdate: user.BirthDate,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			Email:     user.Email,
+		},
+		ID: user.ID}})
 }
 
 func (handler *UserHandler) UpdateProfile(c *gin.Context) {
+	// TODO: check also if user is admin => then update other user than just him
+	user := c.MustGet("user").(models.User)
+	if err := handler.DB.Where("id=?", user.ID).First(&user).Error; err != nil {
+		c.JSON(404, gin.H{"error": "User not found"})
+		return
+	}
 	var UserProfileUpdateData UserProfileDTO
 	if err := c.ShouldBindJSON(&UserProfileUpdateData); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -138,5 +171,27 @@ func (handler *UserHandler) UpdateProfile(c *gin.Context) {
 	if (UserProfileUpdateData == UserProfileDTO{}) {
 		c.JSON(400, gin.H{"error": "No data provided"})
 	}
+
+	// TODO: more elegant way to do this
+	// TODO: if email is changed send confirmation mail
+	// TODO: send email to old mail to verify change
+
+	if user.BirthDate != UserProfileUpdateData.Birthdate && UserProfileUpdateData.Birthdate != "" {
+		user.BirthDate = UserProfileUpdateData.Birthdate
+	}
+
+	if user.FirstName != UserProfileUpdateData.FirstName && UserProfileUpdateData.FirstName != "" {
+		user.FirstName = UserProfileUpdateData.FirstName
+	}
+
+	if user.LastName != UserProfileUpdateData.LastName && UserProfileUpdateData.LastName != "" {
+		user.LastName = UserProfileUpdateData.LastName
+	}
+
+	if user.Email != UserProfileUpdateData.Email && UserProfileUpdateData.Email != "" {
+		user.Email = UserProfileUpdateData.Email
+	}
+
+	handler.DB.Save(&user)
 
 }
