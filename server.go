@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"seahorse.app/server/database"
 	"seahorse.app/server/handlers"
+	"seahorse.app/server/middleware"
 )
 
 func main() {
@@ -23,8 +24,10 @@ func main() {
 	{
 		userGroup.POST("/create", userHandler.Create)
 		userGroup.POST("/login", userHandler.Login)
-		userGroup.GET("/profile", userHandler.Profile)
-		userGroup.PATCH("/profile", userHandler.UpdateProfile)
+		// TODO: let authguard get database instance by itself
+		userGroup.GET("/profile", middleware.AuthGuard(database.DB), userHandler.OwnProfile)
+		userGroup.GET("/profile/:id", middleware.AuthGuard(database.DB), userHandler.Profile)
+		userGroup.PATCH("/profile", middleware.AuthGuard(database.DB), userHandler.UpdateProfile)
 	}
 
 	r.Run()
