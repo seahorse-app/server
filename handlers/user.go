@@ -112,14 +112,31 @@ func (handler *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("token", tokenString, 60*60*24*7, "/", "localhost", false, true)
+	c.SetCookie("session", tokenString, 60*60*24*7, "/", "localhost", false, true)
 	c.JSON(200, gin.H{"ok": 1})
 }
 
 func (handler *UserHandler) Profile(c *gin.Context) {
+	// TODO: check for authorization
+	userID, _ := c.Get("userID")
+	var user models.User
+	if err := handler.DB.Where("id=?", userID).First(&user).Error; err != nil {
+		c.JSON(404, gin.H{"error": "User not found"})
+		return
+	}
 
+	c.JSON(200, gin.H{"user": user})
 }
 
 func (handler *UserHandler) UpdateProfile(c *gin.Context) {
+	var UserProfileUpdateData UserProfileDTO
+	if err := c.ShouldBindJSON(&UserProfileUpdateData); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	if (UserProfileUpdateData == UserProfileDTO{}) {
+		c.JSON(400, gin.H{"error": "No data provided"})
+	}
 
 }
