@@ -133,7 +133,7 @@ func (handler *UserHandler) Login(c *fiber.Ctx) error {
 	cookie.Value = tokenString
 	cookie.Expires = time.Now().Add(time.Hour * 24 * 7)
 	cookie.HTTPOnly = true
-	cookie.Secure = false
+	cookie.SameSite = "none"
 	c.Cookie(cookie)
 	return c.JSON(fiber.Map{
 		"message": "Logged in",

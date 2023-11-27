@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -17,10 +19,14 @@ type JWTClaims struct {
 
 func AuthGuard() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		for k, v := range c.GetReqHeaders() {
+			println(k, strings.Join(v, ","))
+		}
 		cookie := c.Cookies("session")
+		println("cookie", cookie)
 		if cookie == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "Unauthorized",
+				"message": "Unauthorized 1",
 			})
 		}
 

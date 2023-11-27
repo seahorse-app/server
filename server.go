@@ -11,7 +11,17 @@ import (
 func main() {
 	app := fiber.New()
 
-	app.Use(middleware.AuthGuard())
+	database.SetupDatabase()
+
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://localhost:5173",
+		AllowMethods:     "*",
+		AllowHeaders:     "*",
+		AllowCredentials: true,
+		AllowOriginsFunc: nil,
+	}))
+
+	app.Use("/user/profile", middleware.AuthGuard())
 
 	app.Get("/ping", func(ctx *fiber.Ctx) error {
 		return ctx.JSON(fiber.Map{
@@ -19,23 +29,12 @@ func main() {
 		})
 	})
 
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowMethods: "*",
-		AllowCredentials: true,
-		AllowOriginsFunc: func (origin string) bool {
-			return true
-		},
-	}))
-
 	userHandler := handlers.UserHandler{DB: database.DB}
 
 	userGroup := app.Group("/user")
 	userGroup.Post("/create", userHandler.Create)
 	userGroup.Post("/login", userHandler.Login)
 	userGroup.Get("/profile", userHandler.Profile)
-
-	database.SetupDatabase()
 
 	app.Listen(":3000")
 }
