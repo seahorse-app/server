@@ -3,7 +3,7 @@ package handlers
 import (
 	"time"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -42,23 +42,26 @@ type UserProfileOwnerDTO struct {
 	ID uuid.UUID `json:"id"`
 }
 
-func (handler *UserHandler) Create(c *gin.Context) {
+func (handler *UserHandler) Create(c *fiber.Ctx) error {
 	var userData UserCreateDTO
-	if err := c.ShouldBindJSON(&userData); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
+	if err := c.BodyParser(&userData); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid request",
+		})
 	}
 
 	if userFound := handler.DB.Where("email=?", userData.Email).First(&models.User{}); userFound.RowsAffected > 0 {
-		c.JSON(400, gin.H{"error": "User already exists"})
-		return
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"message": "User already exists",
+		})
 	}
 
 	passwordHash, err := utils.HashPassword(userData.Password)
 
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
 	}
 
 	user := models.User{
@@ -69,29 +72,35 @@ func (handler *UserHandler) Create(c *gin.Context) {
 	handler.DB.Create(&user)
 
 	// TODO: send welcome mail to user
-	c.JSON(200, gin.H{"user": user})
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "User created",
+		"user":    user,
+	})
 }
 
-func (handler *UserHandler) Login(c *gin.Context) {
+func (handler *UserHandler) Login(c *fiber.Ctx) error {
 	// TODO: replace with env variable for domain
 	// TODO: check which device is logging in for longer/shorter session
 	// TODO: set cookie expiration accourdingly
 
 	var userLoginData UserLogin
-	if err := c.ShouldBindJSON(&userLoginData); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
+	if err := c.BodyParser(&userLoginData); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid request",
+		})
 	}
 
 	var user models.User
 	if err := handler.DB.Where("email=?", userLoginData.Email).First(&user).Error; err != nil {
-		c.JSON(404, gin.H{"error": "User not found"})
-		return
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "User not found",
+		})
 	}
 
 	if !utils.CheckPassword(userLoginData.Password, user.PasswordHash) {
-		c.JSON(400, gin.H{"error": "Invalid password"})
-		return
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Invalid credentials",
+		})
 	}
 
 	session := models.Session{
@@ -114,84 +123,94 @@ func (handler *UserHandler) Login(c *gin.Context) {
 
 	if err != nil {
 		handler.DB.Delete(&session)
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Internal server error",
+		})
 	}
 
-	c.SetCookie("session", tokenString, 60*60*24*7, "/", "localhost", false, true)
-	c.JSON(200, gin.H{"ok": 1})
+	cookie := new(fiber.Cookie)
+	cookie.Name = "session"
+	cookie.Value = tokenString
+	cookie.Expires = time.Now().Add(time.Hour * 24 * 7)
+	cookie.HTTPOnly = true
+	cookie.Secure = false
+	c.Cookie(cookie)
+	return c.JSON(fiber.Map{
+		"message": "Logged in",
+	})
 }
 
 // TODO: corporate both profile functions into one
 
-func (handler *UserHandler) Profile(c *gin.Context) {
+func (handler *UserHandler) Profile(c *fiber.Ctx) error {
 	// TODO: check for authorization
 	var user models.User
-	userParam := c.Param("id")
+	// TODO: sanitize input
+	userParam := c.Params("id")
 	if err := handler.DB.Where("id=?", userParam).First(&user).Error; err != nil {
-		c.JSON(404, gin.H{"error": "User not found"})
-		return
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "User not found",
+		})
 	}
-	c.JSON(200, gin.H{"user": UserProfileOwnerDTO{
-		UserProfileDTO: UserProfileDTO{
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"user": UserProfileDTO{
 			Birthdate: user.BirthDate,
 			FirstName: user.FirstName,
 			LastName:  user.LastName,
 			Email:     user.Email,
 		},
-		ID: user.ID}})
-
+	})
 }
 
-func (handler *UserHandler) OwnProfile(c *gin.Context) {
-	user := c.MustGet("user").(models.User)
-	c.JSON(200, gin.H{"user": UserProfileOwnerDTO{
-		UserProfileDTO: UserProfileDTO{
-			Birthdate: user.BirthDate,
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			Email:     user.Email,
-		},
-		ID: user.ID}})
-}
+//func (handler *UserHandler) OwnProfile(c *gin.Context) error {
+//	user := c.MustGet("user").(models.User)
+//	c.JSON(200, gin.H{"user": UserProfileOwnerDTO{
+//		UserProfileDTO: UserProfileDTO{
+//			Birthdate: user.BirthDate,
+//			FirstName: user.FirstName,
+//			LastName:  user.LastName,
+//			Email:     user.Email,
+//		},
+//		ID: user.ID}})
+//}
 
-func (handler *UserHandler) UpdateProfile(c *gin.Context) {
-	// TODO: check also if user is admin => then update other user than just him
-	user := c.MustGet("user").(models.User)
-	if err := handler.DB.Where("id=?", user.ID).First(&user).Error; err != nil {
-		c.JSON(404, gin.H{"error": "User not found"})
-		return
-	}
-	var UserProfileUpdateData UserProfileDTO
-	if err := c.ShouldBindJSON(&UserProfileUpdateData); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
+//func (handler *UserHandler) UpdateProfile(c *gin.Context) {
+//	// TODO: check also if user is admin => then update other user than just him
+////	user := c.MustGet("user").(models.User)
+//	if err := handler.DB.Where("id=?", user.ID).First(&user).Error; err != nil {
+//		c.JSON(404, gin.H{"error": "User not found"})
+//		return
+//	}
+//	var UserProfileUpdateData UserProfileDTO
+//	if err := c.BodyParser(&UserProfileUpdateData); err != nil {
+//		c.JSON(400, gin.H{"error": err.Error()})
+//		return
+//	}
 
-	if (UserProfileUpdateData == UserProfileDTO{}) {
-		c.JSON(400, gin.H{"error": "No data provided"})
-	}
+//if (UserProfileUpdateData == UserProfileDTO{}) {
+//	c.JSON(400, gin.H{"error": "No data provided"})
+//}
 
-	// TODO: more elegant way to do this
-	// TODO: if email is changed send confirmation mail
-	// TODO: send email to old mail to verify change
+// TODO: more elegant way to do this
+// TODO: if email is changed send confirmation mail
+// TODO: send email to old mail to verify change
 
-	if user.BirthDate != UserProfileUpdateData.Birthdate && UserProfileUpdateData.Birthdate != "" {
-		user.BirthDate = UserProfileUpdateData.Birthdate
-	}
+//	if user.BirthDate != UserProfileUpdateData.Birthdate && UserProfileUpdateData.Birthdate != "" {
+//		user.BirthDate = UserProfileUpdateData.Birthdate
+////	}
+//
+//	if user.FirstName != UserProfileUpdateData.FirstName && UserProfileUpdateData.FirstName != "" {
+//		user.FirstName = UserProfileUpdateData.FirstName
+//	}
 
-	if user.FirstName != UserProfileUpdateData.FirstName && UserProfileUpdateData.FirstName != "" {
-		user.FirstName = UserProfileUpdateData.FirstName
-	}
+//	if user.LastName != UserProfileUpdateData.LastName && UserProfileUpdateData.LastName != "" {
+//		user.LastName = UserProfileUpdateData.LastName
+//	}
 
-	if user.LastName != UserProfileUpdateData.LastName && UserProfileUpdateData.LastName != "" {
-		user.LastName = UserProfileUpdateData.LastName
-	}
+//	if user.Email != UserProfileUpdateData.Email && UserProfileUpdateData.Email != "" {
+//		user.Email = UserProfileUpdateData.Email
+//	}
 
-	if user.Email != UserProfileUpdateData.Email && UserProfileUpdateData.Email != "" {
-		user.Email = UserProfileUpdateData.Email
-	}
+//	handler.DB.Save(&user)
 
-	handler.DB.Save(&user)
-
-}
+//}

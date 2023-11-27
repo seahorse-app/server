@@ -1,34 +1,41 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"seahorse.app/server/database"
 	"seahorse.app/server/handlers"
 	"seahorse.app/server/middleware"
 )
 
 func main() {
-	r := gin.Default()
-	r.GET("/ping", func(ctx *gin.Context) {
-		ctx.JSON(200, gin.H{
+	app := fiber.New()
+
+	app.Use(middleware.AuthGuard())
+
+	app.Get("/ping", func(ctx *fiber.Ctx) error {
+		return ctx.JSON(fiber.Map{
 			"message": "pong",
 		})
 	})
 
-	// database setup
-	database.SetupDatabase()
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowMethods: "*",
+		AllowCredentials: true,
+		AllowOriginsFunc: func (origin string) bool {
+			return true
+		},
+	}))
 
 	userHandler := handlers.UserHandler{DB: database.DB}
 
-	userGroup := r.Group("/user")
-	{
-		userGroup.POST("/create", userHandler.Create)
-		userGroup.POST("/login", userHandler.Login)
-		// TODO: let authguard get database instance by itself
-		userGroup.GET("/profile", middleware.AuthGuard(database.DB), userHandler.OwnProfile)
-		userGroup.GET("/profile/:id", middleware.AuthGuard(database.DB), userHandler.Profile)
-		userGroup.PATCH("/profile", middleware.AuthGuard(database.DB), userHandler.UpdateProfile)
-	}
+	userGroup := app.Group("/user")
+	userGroup.Post("/create", userHandler.Create)
+	userGroup.Post("/login", userHandler.Login)
+	userGroup.Get("/profile", userHandler.Profile)
 
-	r.Run()
+	database.SetupDatabase()
+
+	app.Listen(":3000")
 }
